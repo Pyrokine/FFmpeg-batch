@@ -75,7 +75,7 @@ def convert_to_h265(source_file, target_file, source_info):
         # ----------------------------------------------------------------------------------------------------
         # ######### 视频流额外设置 ##########
         # 非必需参数，可以尝试开启
-        # '-tune:v': 'lossless',  # 
+        # '-tune:v': 'lossless',  # hq是高清，ll是低延迟，lossless是无损（近乎无压缩）
         # '-rc-lookahead:v': 60,  # 预读帧以预测并控制码率，默认值为60
         # '-sc_threshold:v': '0',  # 场景切换检测阈值（0.0-1.0），若相邻两帧的差异超过阈值则编码器可能会重新选择编码参数以适应新场景，过高可能会导致质量降低，过低可能会导致编码效率降低，0则为禁用检测
         # '-g:v': '250',  # 连续两个I帧间的帧数（1-600），默认值为250，当超过阈值sc_threshold时会插入一个I帧生成新的GOP
@@ -121,7 +121,7 @@ def extract_video_info(file_path):
         'ffprobe.exe -v error -of json -show_format -i {}'.format(file_path),
         shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, encoding='UTF-8', text=True
     )
-    ori_info = json.loads(str(process.stdout))['format']
+    ori_info = json.loads(str(process.stdout).replace('Active code page: 65001\n', ''))['format']
     info['f:file_size'] = '{0:.2f}MB'.format(int(ori_info['size']) / 10 ** 6)
     info['f:duration'] = ori_info['duration']
     info['f:bitrate'] = '{}mbps'.format(round(int(ori_info['bit_rate']) / 1000000, 1))
@@ -136,7 +136,7 @@ def extract_video_info(file_path):
         'ffprobe.exe -v error -of json -show_streams -i {}'.format(file_path),
         shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, encoding='UTF-8', text=True
     )
-    ori_info = json.loads(str(process.stdout))['streams']
+    ori_info = json.loads(str(process.stdout).replace('Active code page: 65001\n', ''))['streams']
 
     for stream in ori_info:
         if stream['codec_type'] == 'video':
@@ -191,7 +191,7 @@ if __name__ == '__main__':
             source_file_path = os.path.join(root, file)
             sub_folder_path = root[len(source_folder_name):]
             target_folder_path = os.path.join(target_folder_name, sub_folder_path)
-            print('{} | {}'.format(os.path.join(sub_folder_path, file), 'is_video' if is_video else 'not_video'))
+            print('{} | {}'.format(os.path.join(sub_folder_path, file), '视频文件' if is_video else '非视频文件'))
 
             if not os.path.exists(target_folder_path):
                 os.makedirs(target_folder_path)
