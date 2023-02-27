@@ -12,7 +12,7 @@ source_folder_name = 'source'
 target_folder_name = 'target'
 force_overwrite = True  # 强制覆盖目标文件夹中已有的文件
 need_copy_other_files = True  # 是否复制其他非视频文件
-quality = 18
+quality = 23
 
 
 def extract_progress(process, source_info):
@@ -62,20 +62,20 @@ def convert_to_h265(source_file, target_file, source_info):
         # 两种模式选择一种开启即可，quality数值越低视频质量越高，一般认为低于18的差异无法用肉眼分辨
         # constqp模式中四个参数设置为相同值和vbr模式三个参数设置为相同值输出的文件是完全相同的
         # ----- Constant Quantization Parameter mode -----
-        # '-rc:v': 'constqp',  # 码率控制模式
-        # '-qp:v': quality,  #
+        '-rc:v': 'constqp',  # 恒定压缩率
+        '-qp:v': quality,
         # '-init_qpP:v': quality,
         # '-init_qpB:v': quality,
         # '-init_qpI:v': quality,
         # ----- Variable bitrate mode -----
-        # '-rc:v': 'vbr',
-        '-cq:v': quality,
-        '-qmin:v': 0,
-        '-qmax:v': 21,
+        # '-rc:v': 'vbr',  # 恒定视频质量
+        # '-cq:v': quality,
+        # '-qmin:v': quality,
+        # '-qmax:v': quality,
         # ----------------------------------------------------------------------------------------------------
         # ######### 视频流额外设置 ##########
         # 非必需参数，可以尝试开启
-        # '-tune:v': 'lossless',  # hq是高清，ll是低延迟，lossless是无损（近乎无压缩）
+        # '-tune:v': 'lossless',  # hq是高清，ll是低延迟，ull超低延迟，lossless是无损（近乎无压缩）
         # '-rc-lookahead:v': 60,  # 预读帧以预测并控制码率，默认值为60
         # '-sc_threshold:v': '0',  # 场景切换检测阈值（0.0-1.0），若相邻两帧的差异超过阈值则编码器可能会重新选择编码参数以适应新场景，过高可能会导致质量降低，过低可能会导致编码效率降低，0则为禁用检测
         # '-g:v': '250',  # 连续两个I帧间的帧数（1-600），默认值为250，当超过阈值sc_threshold时会插入一个I帧生成新的GOP
@@ -86,9 +86,9 @@ def convert_to_h265(source_file, target_file, source_info):
         # '-weighted_pred:v': '1',  # 用以加权预测，允许在预测过程中根据像素的特性调整加权，以提高预测精度和视觉质量
         # ----------------------------------------------------------------------------------------------------
         # ######### 音频流基础设置 ##########
-        # '-c:a': 'aac',  # 编码器为aac
-        # '-b:a': '320k',  # 码率为320kbps
-        # '-ar:a': '48000',  # 采样率为48000Hz
+        '-c:a': 'aac',  # 编码器为aac
+        '-b:a': '320k',  # 码率为320kbps
+        '-ar:a': '48000',  # 采样率为48000Hz
         # '-ac:a': '2',  # 设置通道数为2
         # ----------------------------------------------------------------------------------------------------
         # ######### 音频流滤镜设置 ##########
@@ -118,7 +118,7 @@ def extract_video_info(file_path):
     info = {}
 
     process = subprocess.run(
-        'ffprobe.exe -v error -of json -show_format -i {}'.format(file_path),
+        'ffprobe.exe -v fatal -of json -show_format -i "{}"'.format(file_path),
         shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, encoding='UTF-8', text=True
     )
     ori_info = json.loads(str(process.stdout).replace('Active code page: 65001\n', ''))['format']
@@ -133,7 +133,7 @@ def extract_video_info(file_path):
     info['f:duration'] = round(float(ori_info['duration']), 2)
 
     process = subprocess.run(
-        'ffprobe.exe -v error -of json -show_streams -i {}'.format(file_path),
+        'ffprobe.exe -v fatal -of json -show_streams -i "{}"'.format(file_path),
         shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, encoding='UTF-8', text=True
     )
     ori_info = json.loads(str(process.stdout).replace('Active code page: 65001\n', ''))['streams']
@@ -169,14 +169,14 @@ def extract_subtitle(source_file, target_file, source_info):
     print('检测到字幕，开始生成字幕文件')
     if len(source_info['s:subtitle']) == 1:
         process = subprocess.Popen(
-            'ffmpeg.exe -y -i {0} -map 0:s:0 -c:s ass {1}.ass'.format(source_file, target_file),
+            'ffmpeg.exe -y -i {0} -map 0:s:0 -c:s ass "{1}.ass"'.format(source_file, target_file),
             shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, encoding='UTF-8', text=True
         )
         extract_progress(process, source_info)
     else:
         for idx, lang in source_info['s:subtitle'].items():
             process = subprocess.Popen(
-                'ffmpeg.exe -y -i {0} -map 0:{2} -c:s ass {1}.{2}_{3}.ass'.format(source_file, target_file, idx, lang),
+                'ffmpeg.exe -y -i {0} -map 0:{2} -c:s ass "{1}.{2}_{3}.ass"'.format(source_file, target_file, idx, lang),
                 shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, encoding='UTF-8', text=True
             )
             extract_progress(process, source_info)
@@ -189,7 +189,7 @@ if __name__ == '__main__':
             is_video = file_format.lower() in format_filter
 
             source_file_path = os.path.join(root, file)
-            sub_folder_path = root[len(source_folder_name):]
+            sub_folder_path = root[len(source_folder_name):].lstrip('/').lstrip('\\')
             target_folder_path = os.path.join(target_folder_name, sub_folder_path)
             print('{} | {}'.format(os.path.join(sub_folder_path, file), '视频文件' if is_video else '非视频文件'))
 
