@@ -33,13 +33,13 @@ def extract_progress(process, source_info):
 def convert_to_h265(source_file, target_file, source_info):
     parameters = {
         # ######### 视频流基础设置 ##########
-        '-c:v': 'hevc_nvenc',  # N卡使用hevc_nvenc，A卡使用hevc_amf，I卡使用hevc_qsv，CPU only则用libx265，后续参数适用nvenc，其他编译器参数需自行查阅（建议在源码里查阅）
+        '-c:v': 'hevc_nvenc',  # N卡使用hevc_nvenc，A卡使用hevc_amf，I卡使用hevc_qsv，CPU only则用libx265，直接复制则用copy，后续参数适用nvenc，其他编译器参数需自行查阅（建议在源码里查阅）
         '-preset:v': 'p7',  # nvenc里p1到p7预设从低到高，后续的设置会覆盖其中的对应项
         '-profile:v': 'main10',  # main10最高支持10bits位深，main则为8bits，但若pix_fmt设置了更高的位深（似乎）会自适应到main10或rext
         '-pix_fmt:v': 'p010',  # 使用常见的YUV格式，hevc_nvenc支持[8bits的yuv420p、yuv444p]和[10bits的p010]和[截断到10bits的p016、yuv444p16]，默认为le
         # '-tier:v': 'main',  # 设置到high可以支持更高的位深和更广的色域，profile里似乎没有和high相关的设置
         # '-level:v': '6.2',  # 不同level支持的最高码率帧率位深等参数不同，具体可以在维基中查阅，ffmpeg会自适应，所以不用设置
-        '-b:v': '0',  # 比特率控制设置为无限制（不设置也可以）
+        '-b:v': '0',  # 平均比特率控制设置为无限制（不设置也可以）
         '-maxrate:v': '0',  # 最大比特率设置为无限制（不设置也可以）
         '-bufsize:v': '0',  # 缓存大小设置为无限制（不设置也可以）
         # '-s:v': '1920x1080',  # 分辨率为1920x1080，格式为[宽x高]
@@ -62,20 +62,20 @@ def convert_to_h265(source_file, target_file, source_info):
         # 两种模式选择一种开启即可，quality数值越低视频质量越高，一般认为低于18的差异无法用肉眼分辨
         # constqp模式中四个参数设置为相同值和vbr模式三个参数设置为相同值输出的文件是完全相同的
         # ----- Constant Quantization Parameter mode -----
-        '-rc:v': 'constqp',  # 恒定压缩率
-        '-qp:v': quality,
+        # '-rc:v': 'constqp',  # 恒定压缩率
+        # '-qp:v': quality,
         # '-init_qpP:v': quality,
         # '-init_qpB:v': quality,
         # '-init_qpI:v': quality,
         # ----- Variable bitrate mode -----
-        # '-rc:v': 'vbr',  # 恒定视频质量
-        # '-cq:v': quality,
+        '-rc:v': 'vbr',  # 恒定视频质量
+        '-cq:v': quality,
         # '-qmin:v': quality,
         # '-qmax:v': quality,
         # ----------------------------------------------------------------------------------------------------
         # ######### 视频流额外设置 ##########
         # 非必需参数，可以尝试开启
-        # '-tune:v': 'lossless',  # hq是高清，ll是低延迟，ull超低延迟，lossless是无损（近乎无压缩）
+        # '-tune:v': 'hq',  # hq是高清，ll是低延迟，ull超低延迟，lossless是无损（近乎无压缩）
         # '-rc-lookahead:v': 60,  # 预读帧以预测并控制码率，默认值为60
         # '-sc_threshold:v': '0',  # 场景切换检测阈值（0.0-1.0），若相邻两帧的差异超过阈值则编码器可能会重新选择编码参数以适应新场景，过高可能会导致质量降低，过低可能会导致编码效率降低，0则为禁用检测
         # '-g:v': '250',  # 连续两个I帧间的帧数（1-600），默认值为250，当超过阈值sc_threshold时会插入一个I帧生成新的GOP
@@ -96,7 +96,7 @@ def convert_to_h265(source_file, target_file, source_info):
         # 裁剪语法同视频流，还有其他设置如回声、增益、淡入淡出和循环等，需自行查阅
     }
 
-    command = 'ffmpeg {0} -i "{1}" {2} "{3}"'.format(
+    command = 'ffmpeg.exe {0} -i "{1}" {2} "{3}"'.format(
         '-y' if force_overwrite else '',
         source_file,
         ' '.join(['{} {}'.format(key, value) for key, value in zip(parameters.keys(), parameters.values())]),
@@ -150,13 +150,13 @@ def extract_video_info(file_path):
         elif stream['codec_type'] == 'audio':
             info['a:codec'] = stream['codec_name']
             info['a:sample_rate'] = '{}Hz'.format(stream['sample_rate'])
-            info['a:bit_rate'] = '{}kbps'.format(int(int(stream['bit_rate']) / 1000))
+            info['a:bit_rate'] = '{}kbps'.format(int(int(stream['bit_rate']) / 1000)) if 'bit_rate' in stream else 'N/A'
             info['a:channels'] = stream['channels']
         elif stream['codec_type'] == 'subtitle':
             if 's:subtitle' not in info:
-                info['s:subtitle'] = {stream['index']: stream['tags']['language']}
+                info['s:subtitle'] = {stream['index']: stream['tags']['language'] if ('tags' in stream and 'language' in stream['tags']) else 'nan'}
             else:
-                info['s:subtitle'][stream['index']] = stream['tags']['language']
+                info['s:subtitle'][stream['index']] = stream['tags']['language' if ('tags' in stream and 'language' in stream['tags']) else 'nan']
 
     # pprint(info)
     return info
@@ -169,14 +169,14 @@ def extract_subtitle(source_file, target_file, source_info):
     print('检测到字幕，开始生成字幕文件')
     if len(source_info['s:subtitle']) == 1:
         process = subprocess.Popen(
-            'ffmpeg.exe -y -i {0} -map 0:s:0 -c:s ass "{1}.ass"'.format(source_file, target_file),
+            'ffmpeg.exe -y -i "{0}" -map 0:s:0 -c:s ass "{1}.ass"'.format(source_file, target_file),
             shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, encoding='UTF-8', text=True
         )
         extract_progress(process, source_info)
     else:
         for idx, lang in source_info['s:subtitle'].items():
             process = subprocess.Popen(
-                'ffmpeg.exe -y -i {0} -map 0:{2} -c:s ass "{1}.{2}_{3}.ass"'.format(source_file, target_file, idx, lang),
+                'ffmpeg.exe -y -i "{0}" -map 0:{2} -c:s ass "{1}.{2}_{3}.ass"'.format(source_file, target_file, idx, lang),
                 shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, encoding='UTF-8', text=True
             )
             extract_progress(process, source_info)

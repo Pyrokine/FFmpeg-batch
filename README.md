@@ -7,3 +7,12 @@
 相关参数可以根据个人需求自行调整，具体支持的参数建议在 FFmpeg 源码中查阅
 
 如果运行出现报错，可能是cmd没有设置默认编码为UTF-8，可以自行查阅如何设置
+
+FFmpeg下载地址
+https://ffmpeg.org/download.html
+
+视频质量分析工具
+https://github.com/zymill/hysVideoQC
+
+解锁N卡编码并行线程数
+https://github.com/keylase/nvidia-patch
