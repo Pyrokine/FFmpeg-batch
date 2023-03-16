@@ -4,8 +4,9 @@ import os
 import re
 import json
 import time
-from pprint import pprint
+from loguru import logger
 
+logger.add('log.log', level='INFO')
 format_filter = ['.mp4', '.mkv', '.webm', '.avi', '.flv', '.mov', '.wmv', '.3gp',
                  '.mpg', '.mpeg', '.vob', '.swf', '.rm', '.rmvb', '.m4v', '.ts']  # 完整格式支持通过 [.\ffmpeg.exe -formats] 查看
 source_folder_name = 'source'
@@ -27,7 +28,7 @@ def extract_progress(process, source_info):
             print("\r{0:^3.2f}% [{1:-<50}] 剩余时间：{2:.2f}s".format(
                 progress * 100, '▓' * int(50 * progress), (time.time() - start_time) * (1.0 - progress) / (progress + 1e-6)), end="")
             time.sleep(0.01)
-    print('\r100.0% [▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓] 转换耗时：{0:.2f}s'.format(time.time() - start_time))
+    logger.info('\r100.0% [▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓] 转换耗时：{0:.2f}s'.format(time.time() - start_time))
 
 
 def convert_to_h265(source_file, target_file, source_info):
@@ -109,9 +110,10 @@ def convert_to_h265(source_file, target_file, source_info):
     target_info = extract_video_info(target_file)
     for item in ['f:file_size', 'f:duration', 'f:bitrate', 'f:duration_fmt', 'v:codec', 'v:profile', 'v:level',
                  'v:width', 'v:height', 'v:pix_fmt', 'v:fps', 'a:codec', 'a:sample_rate', 'a:bit_rate', 'a:channels']:
-        print('{0: <15}| {1: <12}-> {2}'.format(
-            item, source_info[item], target_info[item]
-        ))
+        if item in source_info and item in target_info:
+            logger.info('{0: <15}| {1: <12}-> {2}'.format(
+                item, source_info[item], target_info[item]
+            ))
 
 
 def extract_video_info(file_path):
@@ -140,25 +142,25 @@ def extract_video_info(file_path):
 
     for stream in ori_info:
         if stream['codec_type'] == 'video':
-            info['v:codec'] = stream['codec_name']
-            info['v:profile'] = stream['profile']
-            info['v:level'] = stream['level']
-            info['v:width'] = stream['width']
-            info['v:height'] = stream['height']
-            info['v:pix_fmt'] = stream['pix_fmt']
-            info['v:fps'] = round(eval(stream['r_frame_rate']), 2)
+            info['v:codec'] = stream['codec_name'] if 'codec_name' in stream else 'N/A'
+            info['v:profile'] = stream['profile'] if 'profile' in stream else 'N/A'
+            info['v:level'] = stream['level'] if 'level' in stream else 'N/A'
+            info['v:width'] = stream['width'] if 'width' in stream else 'N/A'
+            info['v:height'] = stream['height'] if 'height' in stream else 'N/A'
+            info['v:pix_fmt'] = stream['pix_fmt'] if 'pix_fmt' in stream else 'N/A'
+            info['v:fps'] = round(eval(stream['r_frame_rate']), 2) if 'r_frame_rate' in stream else 'N/A'
         elif stream['codec_type'] == 'audio':
-            info['a:codec'] = stream['codec_name']
-            info['a:sample_rate'] = '{}Hz'.format(stream['sample_rate'])
+            info['a:codec'] = stream['codec_name'] if 'profile' in stream else 'N/A'
+            info['a:sample_rate'] = '{}Hz'.format(stream['sample_rate']) if 'sample_rate' in stream else 'N/A'
             info['a:bit_rate'] = '{}kbps'.format(int(int(stream['bit_rate']) / 1000)) if 'bit_rate' in stream else 'N/A'
-            info['a:channels'] = stream['channels']
+            info['a:channels'] = stream['channels'] if 'channels' in stream else 'N/A'
         elif stream['codec_type'] == 'subtitle':
             if 's:subtitle' not in info:
-                info['s:subtitle'] = {stream['index']: stream['tags']['language'] if ('tags' in stream and 'language' in stream['tags']) else 'nan'}
+                info['s:subtitle'] = {stream['index']: stream['tags']['language'] if ('tags' in stream and 'language' in stream['tags']) else 'N/A'}
             else:
-                info['s:subtitle'][stream['index']] = stream['tags']['language' if ('tags' in stream and 'language' in stream['tags']) else 'nan']
+                info['s:subtitle'][stream['index']] = stream['tags']['language' if ('tags' in stream and 'language' in stream['tags']) else 'N/A']
 
-    # pprint(info)
+    # logger.debug(info)
     return info
 
 
@@ -166,7 +168,7 @@ def extract_subtitle(source_file, target_file, source_info):
     if 's:subtitle' not in source_info:
         return
 
-    print('检测到字幕，开始生成字幕文件')
+    logger.info('检测到字幕，开始生成字幕文件')
     if len(source_info['s:subtitle']) == 1:
         process = subprocess.Popen(
             'ffmpeg.exe -y -i "{0}" -map 0:s:0 -c:s ass "{1}.ass"'.format(source_file, target_file),
@@ -183,15 +185,23 @@ def extract_subtitle(source_file, target_file, source_info):
 
 
 if __name__ == '__main__':
+    num_file_total, num_file_cnt = 0, 0
     for root, dirs, files in os.walk('source'):
         for file in files:
+            num_file_total += 1
+    len_num_file = len(str(num_file_total))
+
+    for root, dirs, files in os.walk('source'):
+        for file in files:
+            num_file_cnt += 1
             file_name, file_format = os.path.splitext(file)
             is_video = file_format.lower() in format_filter
 
             source_file_path = os.path.join(root, file)
             sub_folder_path = root[len(source_folder_name):].lstrip('/').lstrip('\\')
             target_folder_path = os.path.join(target_folder_name, sub_folder_path)
-            print('{} | {}'.format(os.path.join(sub_folder_path, file), '视频文件' if is_video else '非视频文件'))
+            logger.info('{0: >{1}}/{2} | {3} | {4}'.format(
+                num_file_cnt, len_num_file, num_file_total, os.path.join(sub_folder_path, file), '视频文件' if is_video else '非视频文件'))
 
             if not os.path.exists(target_folder_path):
                 os.makedirs(target_folder_path)
@@ -214,8 +224,8 @@ if __name__ == '__main__':
                         source_file_path,
                         os.path.join(target_folder_path, file),
                     )
-                    print('复制完成')
+                    logger.info('复制完成')
                 else:
-                    print('忽略此文件')
+                    logger.info('忽略此文件')
 
-            print('------------------------------------------------------------')
+            logger.info('------------------------------------------------------------')
