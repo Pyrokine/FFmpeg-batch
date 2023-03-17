@@ -104,7 +104,7 @@ def convert_to_h265(source_file, target_file, source_info):
         target_file
     )
 
-    process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, encoding='UTF-8', text=True)
+    process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding='UTF-8', errors='replace')
     extract_progress(process, source_info)
 
     target_info = extract_video_info(target_file)
@@ -121,9 +121,9 @@ def extract_video_info(file_path):
 
     process = subprocess.run(
         'ffprobe.exe -v fatal -of json -show_format -i "{}"'.format(file_path),
-        shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, encoding='UTF-8', text=True
+        shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding='UTF-8', errors='replace'
     )
-    ori_info = json.loads(str(process.stdout).replace('Active code page: 65001\n', ''))['format']
+    ori_info = json.loads(str(process.stdout))['format']
     info['f:file_size'] = '{0:.2f}MB'.format(int(ori_info['size']) / 10 ** 6)
     info['f:duration'] = ori_info['duration']
     info['f:bitrate'] = '{}mbps'.format(round(int(ori_info['bit_rate']) / 1000000, 1))
@@ -136,9 +136,9 @@ def extract_video_info(file_path):
 
     process = subprocess.run(
         'ffprobe.exe -v fatal -of json -show_streams -i "{}"'.format(file_path),
-        shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, encoding='UTF-8', text=True
+        shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding='UTF-8', errors='replace'
     )
-    ori_info = json.loads(str(process.stdout).replace('Active code page: 65001\n', ''))['streams']
+    ori_info = json.loads(str(process.stdout))['streams']
 
     for stream in ori_info:
         if stream['codec_type'] == 'video':
@@ -172,14 +172,14 @@ def extract_subtitle(source_file, target_file, source_info):
     if len(source_info['s:subtitle']) == 1:
         process = subprocess.Popen(
             'ffmpeg.exe -y -i "{0}" -map 0:s:0 -c:s ass "{1}.ass"'.format(source_file, target_file),
-            shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, encoding='UTF-8', text=True
+            shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding='UTF-8', errors='replace'
         )
         extract_progress(process, source_info)
     else:
         for idx, lang in source_info['s:subtitle'].items():
             process = subprocess.Popen(
                 'ffmpeg.exe -y -i "{0}" -map 0:{2} -c:s ass "{1}.{2}_{3}.ass"'.format(source_file, target_file, idx, lang),
-                shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, encoding='UTF-8', text=True
+                shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding='UTF-8', errors='replace'
             )
             extract_progress(process, source_info)
 

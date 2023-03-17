@@ -8,8 +8,6 @@
 
 直接执行源码需要安装 [python] 并安装依赖 [requirements.txt] ，安装完成后运行 [main.py] 即可。也可以直接运行可执行文件 [main.exe]
 
-如果运行出现报错，可能是cmd没有设置默认编码为UTF-8，可以自行查阅如何设置
-
 打包为可执行文件的命令为 [nuitka --standalone --onefile main.py] ，需要通过 [pip] 安装 [nuitka]
 
 FFmpeg下载地址
